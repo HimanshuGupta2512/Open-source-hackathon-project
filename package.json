@@ -1,0 +1,16 @@
+{
+  "name": "codebase-contextualizer-cli",
+  "version": "1.0.0",
+  "description": "A high-performance local semantic search engine for codebases.",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "contextualizer": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  }
+}
