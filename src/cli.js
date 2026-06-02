@@ -1,9 +1,12 @@
 import { Command } from 'commander';
 import os from 'os';
 import path from 'path';
+import fs from 'fs/promises';
 import { getFileHash } from './utils/hash.js';
 import { walkDirectory } from './utils/walker.js';
 import { CacheManager } from './core/cache.js';
+import { parseCode } from './core/parser.js';
+import { extractSemantics } from './core/extractor.js';
 
 export function createCli() {
   const program = new Command();
@@ -33,6 +36,7 @@ export function createCli() {
       
       let newOrModified = 0;
       let unchanged = 0;
+      let totalChunks = 0;
 
       for (let i = 0; i < files.length; i += workers) {
         const batch = files.slice(i, i + workers);
@@ -44,6 +48,13 @@ export function createCli() {
           } else {
             cacheManager.update(relativePath, hash);
             newOrModified++;
+            
+            if (/\.(js|mjs|cjs)$/.test(file)) {
+              const sourceCode = await fs.readFile(file, 'utf8');
+              const ast = await parseCode(sourceCode);
+              const chunks = extractSemantics(ast.rootNode, sourceCode);
+              totalChunks += chunks.length;
+            }
           }
         }));
       }
@@ -53,6 +64,7 @@ export function createCli() {
       console.log(`[CLI] Total files found: ${files.length}`);
       console.log(`[CLI] Number of new/modified files: ${newOrModified}`);
       console.log(`[CLI] Number of unchanged files (skipped): ${unchanged}`);
+      console.log(`[CLI] Total semantic chunks extracted: ${totalChunks}`);
     });
 
   program
