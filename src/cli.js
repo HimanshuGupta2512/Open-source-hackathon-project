@@ -5,8 +5,7 @@ import fs from 'fs/promises';
 import { getFileHash } from './utils/hash.js';
 import { walkDirectory } from './utils/walker.js';
 import { CacheManager } from './core/cache.js';
-import { parseCode } from './core/parser.js';
-import { extractSemantics } from './core/extractor.js';
+import { WorkerPool } from './core/pool.js';
 
 export function createCli() {
   const program = new Command();
@@ -22,6 +21,7 @@ export function createCli() {
     .argument('<dir>', 'Directory path to index')
     .option('-w, --workers <count>', 'Number of worker threads', (val) => parseInt(val, 10))
     .action(async (dir, options) => {
+      const startTime = Date.now();
       const defaultWorkers = Math.min(4, Math.max(1, os.cpus().length - 1));
       const workers = options.workers || defaultWorkers;
       const targetDir = path.resolve(dir);
@@ -32,11 +32,16 @@ export function createCli() {
       const cacheManager = new CacheManager(targetDir);
       await cacheManager.load();
 
+      const workerScriptUrl = new URL('./core/worker.js', import.meta.url);
+      const pool = new WorkerPool(workers, workerScriptUrl);
+
       const files = await walkDirectory(targetDir);
       
       let newOrModified = 0;
       let unchanged = 0;
       let totalChunks = 0;
+
+      const tasks = [];
 
       for (let i = 0; i < files.length; i += workers) {
         const batch = files.slice(i, i + workers);
@@ -50,21 +55,33 @@ export function createCli() {
             newOrModified++;
             
             if (/\.(js|mjs|cjs)$/.test(file)) {
-              const sourceCode = await fs.readFile(file, 'utf8');
-              const ast = await parseCode(sourceCode);
-              const chunks = extractSemantics(ast.rootNode, sourceCode);
-              totalChunks += chunks.length;
+              tasks.push(pool.runTask(file));
             }
           }
         }));
       }
 
+      try {
+        const results = await Promise.all(tasks);
+        for (const result of results) {
+          totalChunks += result.chunks.length;
+        }
+      } catch (err) {
+        console.error('[CLI] Error during semantic extraction:', err);
+      } finally {
+        pool.destroy();
+      }
+
       await cacheManager.save();
+
+      const durationMs = Date.now() - startTime;
+      const durationSec = (durationMs / 1000).toFixed(2);
 
       console.log(`[CLI] Total files found: ${files.length}`);
       console.log(`[CLI] Number of new/modified files: ${newOrModified}`);
       console.log(`[CLI] Number of unchanged files (skipped): ${unchanged}`);
       console.log(`[CLI] Total semantic chunks extracted: ${totalChunks}`);
+      console.log(`[CLI] Total execution time: ${durationSec}s`);
     });
 
   program
