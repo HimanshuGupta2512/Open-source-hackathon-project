@@ -6,6 +6,7 @@ import { getFileHash } from './utils/hash.js';
 import { walkDirectory } from './utils/walker.js';
 import { CacheManager } from './core/cache.js';
 import { WorkerPool } from './core/pool.js';
+import { DBManager } from './core/db.js';
 
 export function createCli() {
   const program = new Command();
@@ -35,6 +36,9 @@ export function createCli() {
       const workerScriptUrl = new URL('./core/worker.js', import.meta.url);
       const pool = new WorkerPool(workers, workerScriptUrl);
 
+      const dbManager = new DBManager(targetDir);
+      dbManager.init();
+
       const files = await walkDirectory(targetDir);
       
       let newOrModified = 0;
@@ -55,7 +59,11 @@ export function createCli() {
             newOrModified++;
             
             if (/\.(js|mjs|cjs)$/.test(file)) {
-              tasks.push(pool.runTask(file));
+              tasks.push(
+                pool.runTask(file).then(result => {
+                  return { relativePath, hash, chunks: result.chunks };
+                })
+              );
             }
           }
         }));
@@ -65,11 +73,13 @@ export function createCli() {
         const results = await Promise.all(tasks);
         for (const result of results) {
           totalChunks += result.chunks.length;
+          dbManager.saveFileChunks(result.relativePath, result.hash, result.chunks);
         }
       } catch (err) {
         console.error('[CLI] Error during semantic extraction:', err);
       } finally {
         pool.destroy();
+        dbManager.close();
       }
 
       await cacheManager.save();
