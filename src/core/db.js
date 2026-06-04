@@ -42,6 +42,12 @@ export class DBManager {
       CREATE INDEX IF NOT EXISTS idx_files_filepath ON files(filepath);
       CREATE INDEX IF NOT EXISTS idx_chunks_file_id ON chunks(file_id);
     `);
+
+    const columns = this.db.pragma('table_info(chunks)');
+    const hasEmbedding = columns.some(col => col.name === 'embedding');
+    if (!hasEmbedding) {
+      this.db.exec('ALTER TABLE chunks ADD COLUMN embedding TEXT;');
+    }
   }
 
   saveFileChunks(filepath, hash, chunksArr) {
@@ -62,12 +68,19 @@ export class DBManager {
       this.db.prepare('DELETE FROM chunks WHERE file_id = ?').run(fileId);
 
       const insertChunk = this.db.prepare(`
-        INSERT INTO chunks (file_id, node_type, start_line, end_line, content)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO chunks (file_id, node_type, start_line, end_line, content, embedding)
+        VALUES (?, ?, ?, ?, ?, ?)
       `);
 
       for (const chunk of chunks) {
-        insertChunk.run(fileId, chunk.type, chunk.startLine, chunk.endLine, chunk.text);
+        insertChunk.run(
+          fileId,
+          chunk.type,
+          chunk.startLine,
+          chunk.endLine,
+          chunk.text,
+          chunk.embedding ? JSON.stringify(chunk.embedding) : null
+        );
       }
     });
 

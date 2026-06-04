@@ -29,6 +29,7 @@ export function createCli() {
       
       console.log(`[CLI] Initializing indexing for directory: ${targetDir}`);
       console.log(`[CLI] Worker threads allocated: ${workers}`);
+      console.log(`[CLI] Local AI embedding model (Xenova/all-MiniLM-L6-v2) is initializing across workers...`);
 
       const cacheManager = new CacheManager(targetDir);
       await cacheManager.load();
@@ -90,7 +91,7 @@ export function createCli() {
       console.log(`[CLI] Total files found: ${files.length}`);
       console.log(`[CLI] Number of new/modified files: ${newOrModified}`);
       console.log(`[CLI] Number of unchanged files (skipped): ${unchanged}`);
-      console.log(`[CLI] Total semantic chunks extracted: ${totalChunks}`);
+      console.log(`[CLI] Total semantic chunks extracted & embedded: ${totalChunks}`);
       console.log(`[CLI] Total execution time: ${durationSec}s`);
     });
 
