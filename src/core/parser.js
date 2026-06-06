@@ -1,7 +1,5 @@
-import { createRequire } from 'module';
+import { Parser } from 'web-tree-sitter';
 import path from 'path';
-const require = createRequire(import.meta.url);
-const Parser = require('web-tree-sitter');
 
 let parserInstance = null;
 
