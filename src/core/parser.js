@@ -1,9 +1,7 @@
-import Parser from 'web-tree-sitter';
+import { createRequire } from 'module';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
+const Parser = require('web-tree-sitter');
 
 let parserInstance = null;
 
@@ -11,9 +9,8 @@ export async function parseCode(sourceCode) {
   if (!parserInstance) {
     await Parser.init();
     parserInstance = new Parser();
-    const wasmPath = path.join(__dirname, '../../tree-sitter-javascript.wasm');
-    const lang = await Parser.Language.load(wasmPath);
-    parserInstance.setLanguage(lang);
+    const Lang = await Parser.Language.load(path.join(process.cwd(), 'tree-sitter-javascript.wasm'));
+    parserInstance.setLanguage(Lang);
   }
   return parserInstance.parse(sourceCode);
 }
