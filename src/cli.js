@@ -7,6 +7,7 @@ import { walkDirectory } from './utils/walker.js';
 import { CacheManager } from './core/cache.js';
 import { WorkerPool } from './core/pool.js';
 import { DBManager } from './core/db.js';
+import { executeSearch } from './core/search.js';
 
 export function createCli() {
   const program = new Command();
@@ -109,10 +110,30 @@ export function createCli() {
     .argument('<query>', 'Natural language search query')
     .argument('<dir>', 'Directory path of the indexed codebase')
     .option('--json', 'Output results in raw JSON format', false)
-    .action((query, dir, options) => {
-      console.log(`[CLI] Executing semantic search in: ${dir}`);
-      console.log(`[CLI] Query: "${query}"`);
-      console.log(`[CLI] JSON Output Mode: ${options.json}`);
+    .action(async (query, dir, options) => {
+      if (!options.json) {
+        console.log(`[CLI] Executing semantic search in: ${dir}`);
+        console.log(`[CLI] Query: "${query}"`);
+      }
+
+      try {
+        const results = await executeSearch(query, dir, options);
+        
+        if (options.json) {
+          console.log(JSON.stringify(results));
+        } else {
+          console.log(`\n--- Top ${results.length} Matches ---`);
+          results.forEach((res, index) => {
+            console.log(`\n[${index + 1}] File: ${res.filepath}`);
+            console.log(`    Lines: ${res.startLine} to ${res.endLine}`);
+            console.log(`    Score: ${(res.score * 100).toFixed(2)}%`);
+            console.log(`    Code:\n${res.content.split('\\n').map(line => '      ' + line).join('\\n')}`);
+          });
+          console.log('\n-----------------------');
+        }
+      } catch (err) {
+        console.error('[CLI] Search failed:', err);
+      }
     });
 
   return program;
